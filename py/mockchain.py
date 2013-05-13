@@ -82,15 +82,13 @@ def parse_args(args):
 
     return opts, args
     
-def add_local_repo(infile, destfile, baseurl, repoid=None):
+def add_local_repo(destfile, baseurl, repoid=None):
     """take a mock chroot config and add a repo to it's yum.conf
        infile = mock chroot config file
        destfile = where to save out the result
        baseurl = baseurl of repo you wish to add"""
         
     try:
-        config_opts = {}
-        execfile(infile)
         if not repoid:
             repoid=baseurl.split('//')[1].replace('/','_')
         localyumrepo="""
@@ -102,11 +100,9 @@ skip_if_unavailable=1
 metadata_expire=30
 cost=1
 """ % (repoid, baseurl, baseurl)
-
-        config_opts['yum.conf'] += localyumrepo
-        br_dest = open(destfile, 'w')
-        for k,v in config_opts.items():
-            br_dest.write("config_opts[%r] = %r\n" % (k, v))
+        
+        br_dest = open(destfile, 'a')
+        br_dest.write("\nconfig_opts['yum.conf'] += %r\n" % localyumrepo)
         br_dest.close()
         return True, ''
     except (IOError, OSError):
@@ -224,15 +220,16 @@ def main(args):
     log(opts.logfile, "config dir: %s" % opts.config_path)
 
     my_mock_config = opts.config_path + '/' + os.path.basename(mockcfg)
+    shutil.copyfile(mockcfg, my_mock_config)
     
     # modify with localrepo
-    res, msg = add_local_repo(mockcfg, my_mock_config, local_baseurl, 'local_build_repo')
+    res, msg = add_local_repo(my_mock_config, local_baseurl, 'local_build_repo')
     if not res:
          log(opts.logfile, "Error: Could not write out local config: %s" % msg)
          sys.exit(1)
 
     for baseurl in opts.repos:
-        res, msg =  add_local_repo(my_mock_config, my_mock_config, baseurl)
+        res, msg =  add_local_repo(my_mock_config, baseurl)
         if not res:
             log(opts.logfile, "Error: Could not add: %s to yum config in mock chroot: %s" % (baseurl, msg))
             sys.exit(1)
